@@ -1,58 +1,125 @@
-![](docs/images/logo.png)
+Usage: ./magiskboot <action> [args...]
 
-[![Downloads](https://img.shields.io/badge/dynamic/json?color=green&label=Downloads&query=totalString&url=https%3A%2F%2Fraw.githubusercontent.com%2Ftopjohnwu%2Fmagisk-files%2Fcount%2Fcount.json&cacheSeconds=1800)](https://raw.githubusercontent.com/topjohnwu/magisk-files/count/count.json)
+Supported actions:
+  unpack [-n] [-h] <bootimg>
+    Unpack <bootimg> to its individual components, each component to
+    a file with its corresponding file name in the current directory.
+    Supported components: kernel, kernel_dtb, ramdisk.cpio, second,
+    dtb, extra, and recovery_dtbo.
+    By default, each component will be automatically decompressed
+    on-the-fly before writing to the output file.
+    If '-n' is provided, all decompression operations will be skipped;
+    each component will remain untouched, dumped in its original format.
+    If '-h' is provided, the boot image header information will be
+    dumped to the file 'header', which can be used to modify header
+    configurations during repacking.
+    Return values:
+    0:valid    1:error    2:chromeos
 
-#### This is not an officially supported Google product
+  repack [-n] <origbootimg> [outbootimg]
+    Repack boot image components using files from the current directory
+    to [outbootimg], or 'new-boot.img' if not specified. Current directory
+    should only contain required files for [outbootimg], or incorrect
+    [outbootimg] may be produced.
+    <origbootimg> is the original boot image used to unpack the components.
+    By default, each component will be automatically compressed using its
+    corresponding format detected in <origbootimg>. If a component file
+    in the current directory is already compressed, then no addition
+    compression will be performed for that specific component.
+    If '-n' is provided, all compression operations will be skipped.
+    If env variable PATCHVBMETAFLAG is set to true, all disable flags in
+    the boot image's vbmeta header will be set.
 
-## Introduction
+  verify <bootimg> [x509.pem]
+    Check whether the boot image is signed with AVB 1.0 signature.
+    Optionally provide a certificate to verify whether the image is
+    signed by the public key certificate.
+    Return value:
+    0:valid    1:error
 
-Magisk is a suite of open source software for customizing Android, supporting devices higher than Android 6.0.<br>
-Some highlight features:
+  sign <bootimg> [name] [x509.pem pk8]
+    Sign <bootimg> with AVB 1.0 signature.
+    Optionally provide the name of the image (default: '/boot').
+    Optionally provide the certificate/private key pair for signing.
+    If the certificate/private key pair is not provided, the AOSP
+    verity key bundled in the executable will be used.
 
-- **MagiskSU**: Provide root access for applications
-- **Magisk Modules**: Modify read-only partitions by installing modules
-- **MagiskBoot**: The most complete tool for unpacking and repacking Android boot images
-- **Zygisk**: Run code in every Android applications' processes
+  extract <payload.bin> [partition] [outfile]
+    Extract [partition] from <payload.bin> to [outfile].
+    If [outfile] is not specified, then output to '[partition].img'.
+    If [partition] is not specified, then attempt to extract either
+    'init_boot' or 'boot'. Which partition was chosen can be determined
+    by whichever 'init_boot.img' or 'boot.img' exists.
+    <payload.bin> can be '-' to be STDIN.
 
-## Downloads
+  hexpatch <file> <hexpattern1> <hexpattern2>
+    Search <hexpattern1> in <file>, and replace it with <hexpattern2>
 
-[Github](https://github.com/topjohnwu/Magisk/releases) is the only source where you can get official Magisk information and downloads.
+  cpio <incpio> [commands...]
+    Do cpio commands to <incpio> (modifications are done in-place)
+    Each command is a single argument, add quotes for each command.
+    Supported commands:
+      exists ENTRY
+        Return 0 if ENTRY exists, else return 1
+      rm [-r] ENTRY
+        Remove ENTRY, specify [-r] to remove recursively
+      mkdir MODE ENTRY
+        Create directory ENTRY in permissions MODE
+      ln TARGET ENTRY
+        Create a symlink to TARGET with the name ENTRY
+      mv SOURCE DEST
+        Move SOURCE to DEST
+      add MODE ENTRY INFILE
+        Add INFILE as ENTRY in permissions MODE; replaces ENTRY if exists
+      extract [ENTRY OUT]
+        Extract ENTRY to OUT, or extract all entries to current directory
+      test
+        Test the cpio's status
+        Return value is 0 or bitwise or-ed of following values:
+        0x1:Magisk    0x2:unsupported
+      patch
+        Apply ramdisk patches
+        Configure with env variables: KEEPVERITY KEEPFORCEENCRYPT
+      backup ORIG
+        Create ramdisk backups from ORIG
+      restore
+        Restore ramdisk from ramdisk backup stored within incpio
 
-## Useful Links
+  dtb <file> <action> [args...]
+    Do dtb related actions to <file>
+    Supported actions:
+      print [-f]
+        Print all contents of dtb for debugging
+        Specify [-f] to only print fstab nodes
+      patch
+        Search for fstab and remove verity/avb
+        Modifications are done directly to the file in-place
+        Configure with env variables: KEEPVERITY
+      test
+        Test the fstab's status
+        Return values:
+        0:valid    1:error
 
-- [Installation Instruction](https://topjohnwu.github.io/Magisk/install.html)
-- [Building and Development](https://topjohnwu.github.io/Magisk/build.html)
-- [Magisk Documentation](https://topjohnwu.github.io/Magisk/)
-- [Zygisk module sample](https://github.com/topjohnwu/zygisk-module-sample)
+  split <file>
+    Split image.*-dtb into kernel + kernel_dtb
 
-## Bug Reports
+  sha1 <file>
+    Print the SHA1 checksum for <file>
 
-**Only bug reports from Debug builds will be accepted.**
+  cleanup
+    Cleanup the current working directory
 
-For installation issues, upload both boot image and install logs.<br>
-For Magisk issues, upload boot logcat or dmesg.<br>
-For Magisk app crashes, record and upload the logcat when the crash occurs.
+  compress[=format] <infile> [outfile]
+    Compress <infile> with [format] to [outfile].
+    <infile>/[outfile] can be '-' to be STDIN/STDOUT.
+    If [format] is not specified, then gzip will be used.
+    If [outfile] is not specified, then <infile> will be replaced
+    with another file suffixed with a matching file extension.
+    Supported formats: gzip zopfli xz lzma bzip2 lz4 lz4_legacy lz4_lg 
 
-## Translation Contributions
-
-Default string resources for the Magisk app and its stub APK are located here:
-
-- `app/core/src/main/res/values/strings.xml`
-- `app/stub/src/main/res/values/strings.xml`
-
-Translate each and place them in the respective locations (`[module]/src/main/res/values-[lang]/strings.xml`).
-
-## License
-
-    Magisk, including all git submodules are free software:
-    you can redistribute it and/or modify it under the terms of the
-    GNU General Public License as published by the Free Software Foundation,
-    either version 3 of the License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  decompress <infile> [outfile]
+    Detect format and decompress <infile> to [outfile].
+    <infile>/[outfile] can be '-' to be STDIN/STDOUT.
+    If [outfile] is not specified, then <infile> will be replaced
+    with another file removing its archive format file extension.
+    Supported formats: gzip zopfli xz lzma
